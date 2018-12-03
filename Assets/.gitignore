@@ -1,0 +1,8 @@
+*.meta
+*.iml
+*.xml
+.idea
+NGUI
+Resources
+Standard Assets
+T4M
