@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 
-public class MapGrids
+public class MapGrid
 {
     public readonly float StartX;
 
@@ -15,13 +15,10 @@ public class MapGrids
 
     public readonly int Columns;
 
-    public readonly MapGrid[,] Grids;
+    public readonly MapCell[,] Cells;
 
-    private readonly Collider _walkable;
-
-    public MapGrids(BinaryReader reader, Collider walkable)
+    public MapGrid(BinaryReader reader)
     {
-        _walkable = walkable;
         StartX = reader.ReadInt32() / 100f;
         StartZ = reader.ReadInt32() / 100f;
 
@@ -30,14 +27,14 @@ public class MapGrids
         Rows = reader.ReadInt32();
         Columns = reader.ReadInt32();
 
-        Grids = new MapGrid[Rows, Columns];
+        Cells = new MapCell[Rows, Columns];
 
         for (int row = 0; row < Rows; row++)
         {
             for (int column = 0; column < Columns; column++)
             {
                 var type = (GridType) reader.ReadByte();
-                Grids[row, column] = new MapGrid(this, row, column, type);
+                Cells[row, column] = new MapCell(this, row, column, type);
             }
         }
 
@@ -45,7 +42,7 @@ public class MapGrids
         SetAreas();
     }
 
-    public MapGrids(Collider walkable, Collider safety, Collider obstacle, float size)
+    public MapGrid(Collider walkable, Collider safety, Collider obstacle, float size)
     {
         var bounds = walkable.bounds;
         StartX = bounds.min.x;
@@ -54,7 +51,7 @@ public class MapGrids
         Columns = Convert.ToInt32(bounds.size.x / size); // 列有宽度决定
         Size = size;
 
-        Grids = new MapGrid[Rows, Columns];
+        Cells = new MapCell[Rows, Columns];
         // 设置grid类型
         for (var row = 0; row < Rows; row += 1)
         {
@@ -67,7 +64,7 @@ public class MapGrids
                 var rightTop = getPointType(point + new Vector3(size, 0, size), walkable, safety, obstacle);
                 var gridType = (GridType) Math.Min(Math.Min((int) leftBottom, (int) leftTop),
                     Math.Min((int) rightBottom, (int) rightTop));
-                Grids[row, column] = new MapGrid(this, row, column, gridType);
+                Cells[row, column] = new MapCell(this, row, column, gridType);
             }
         }
         // 设置区域id
@@ -93,7 +90,7 @@ public class MapGrids
     private bool SetGridArea(int areaId, int row, int column)
     {
         if (row < 0 || column < 0 || row >= Rows || column >= Columns) return false;
-        var grid = Grids[row, column];
+        var grid = Cells[row, column];
         if (grid.Type != GridType.NotReachable && grid.AreaId == 0)
         {
             grid.AreaId = areaId;
@@ -137,47 +134,29 @@ public class MapGrids
         return type;
     }
 
-    public bool Sample(float x, float z, out float y)
-    {
-        var grid = GetMapGrid(x, z);
-        if (grid != null && grid.IsWalkable())
-        {
-            var origin = new Vector3(x, _walkable.bounds.max.y + 1, z);
-            var hits = Physics.RaycastAll(origin, Vector3.down, Mathf.Infinity, 1 << _walkable.gameObject.layer);
-            var idx = hits.ToList().FindIndex(t => t.collider == _walkable);
-            if (idx != -1)
-            {
-                y = hits[idx].point.y;
-                return true;
-            }
-        }
-        y = 0;
-        return false;
-    }
-
-    public MapGrid GetMapGrid(int row, int column)
+    public MapCell GetMapCell(int row, int column)
     {
         if (row >= 0 && row < Rows && column >= 0 && column < Columns)
         {
-            return Grids[row, column];
+            return Cells[row, column];
         }
 
         return null;
     }
 
-    public MapGrid GetMapGrid(Vector3 v)
+    public MapCell GetMapCell(Vector3 v)
     {
-        return GetMapGrid(v.x, v.z);
+        return GetMapCell(v.x, v.z);
     }
 
-    public MapGrid GetMapGrid(float x, float z)
+    public MapCell GetMapCell(float x, float z)
     {
         int row = (int) Math.Floor((z - StartZ) / Size);
         int column = (int) Math.Floor((x - StartX) / Size);
 
         if (row >= 0 && row < Rows && column >= 0 && column < Columns)
         {
-            return Grids[row, column];
+            return Cells[row, column];
         }
 
         return null;
@@ -197,7 +176,7 @@ public class MapGrids
         {
             for (int column = 0; column < Columns; column++)
             {
-                var grid = Grids[row, column];
+                var grid = Cells[row, column];
                 // 类型
                 writer.Write(Convert.ToByte(grid.Type));
             }
@@ -216,9 +195,9 @@ public enum GridType
     Obstacle = 3 // 障碍物
 }
 
-public class MapGrid
+public class MapCell
 {
-    private readonly MapGrids _grids;
+    private readonly MapGrid _grid;
 
     private readonly int _row;
 
@@ -255,17 +234,15 @@ public class MapGrid
 
     public Vector3 Center()
     {
-        var halfSize = _grids.Size / 2f;
-        var x = _grids.StartX + _column * _grids.Size + halfSize;
-        var z = _grids.StartZ + _row * _grids.Size + halfSize;
-        float y;
-        _grids.Sample(x, z, out y);
-        return new Vector3(x, y, z);
+        var halfSize = _grid.Size / 2f;
+        var x = _grid.StartX + _column * _grid.Size + halfSize;
+        var z = _grid.StartZ + _row * _grid.Size + halfSize;
+        return new Vector3(x, 0, z);
     }
 
-    public MapGrid(MapGrids grids, int row, int column, GridType type)
+    public MapCell(MapGrid grid, int row, int column, GridType type)
     {
-        _grids = grids;
+        _grid = grid;
         _row = row;
         _column = column;
         Type = type;

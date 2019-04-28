@@ -7,74 +7,74 @@ using UnityEngine;
 
 public class AStarPath
 {
-    private readonly MapGrids _grids;
+    private readonly MapGrid _grid;
 
-    private readonly MapGrid _to;
+    private readonly MapCell _to;
 
-    private readonly MapGrid _from;
+    private readonly MapCell _from;
 
     private readonly List<Node> _list = new List<Node>();
 
-    public AStarPath(MapGrids grids, MapGrid from, MapGrid to)
+    public AStarPath(MapGrid grid, MapCell from, MapCell to)
     {
         if (!from.IsWalkable() || !to.IsWalkable()) throw new Exception("Start or End point is not reachable.");
-        _grids = grids;
+        _grid = grid;
         _from = from;
         _to = to;
         int h = Math.Abs(from.Row - to.Row) + Math.Abs(from.Column - to.Column);
         _list.Add(new Node(null, from, 0, h));
     }
 
-    public List<MapGrid> Find()
+    public List<MapCell> Find()
     {
         return Compress(MergePath(Find0()));
     }
 
-    private List<MapGrid> Compress(List<MapGrid> path)
+    private List<MapCell> Compress(List<MapCell> path)
     {
-        var list = new List<MapGrid> {path[0]};
-        while (list[list.Count - 1] != path[path.Count - 1])
+        var list = new List<MapCell> {path[0]};
+        while (list.Last() != path.Last())
         {
-            list.Add(path.FindLast(t => IsNotStop(list[list.Count - 1], t)));
+            list.Add(path.FindLast(t => DirectTo(list.Last(), t)));
         }
 
         return list;
     }
-
-    private bool IsNotStop(MapGrid g1, MapGrid g2)
+    
+    private bool DirectTo(MapCell c1, MapCell c2)
     {
-        if (g1 == g2) return true;
-        var from = g1.Center();
-        var to = g2.Center();
+        if (c1 == c2) return true;
+        var from = c1.Center();
+        var to = c2.Center();
 
         var direction = (to - from).normalized;
         var position = from;
-        var grid = g1;
-        MapGrid prev = null;
-        while (grid != g2)
+        var cell = c1;
+        MapCell prev = null;
+        while (cell != c2)
         {
-            if (!grid.IsWalkable()) return false;
-            if (prev != null && prev.Row != grid.Row && prev.Column != grid.Column)
+            if (!cell.IsWalkable()) return false;
+            if (prev != null && prev.Row != cell.Row && prev.Column != cell.Column)
             {
-                if (!_grids.GetMapGrid(prev.Row, grid.Column).IsWalkable() ||
-                    !_grids.GetMapGrid(grid.Row, prev.Column).IsWalkable())
+                if (!_grid.GetMapCell(prev.Row, cell.Column).IsWalkable() ||
+                    !_grid.GetMapCell(cell.Row, prev.Column).IsWalkable())
                 {
                     return false;
                 }
             }
 
-            prev = grid;
-            position += direction * _grids.Size;
-            grid = _grids.GetMapGrid(position);
+            prev = cell;
+            position += direction * _grid.Size;
+            cell = _grid.GetMapCell(position);
         }
 
         return true;
     }
 
-    private List<MapGrid> MergePath(List<MapGrid> path)
+    private List<MapCell> MergePath(List<MapCell> path)
     {
         var grids = path;
-        var list = new List<MapGrid>();
+        var list = new List<MapCell>();
         var z = 0;
         var x = 0;
 
@@ -96,22 +96,22 @@ public class AStarPath
         return list;
     }
 
-    private List<MapGrid> Find0()
+    private List<MapCell> Find0()
     {
-        if (_from == _to) return new List<MapGrid> {_from, _to};
+        if (_from == _to) return new List<MapCell> {_from, _to};
         var minNode = GetMinNode();
         while (minNode != null)
         {
             minNode.Checked = true;
             foreach (var child in SurroundNodes(minNode))
             {
-                if (child.Grid == _to) // find it
+                if (child.Cell == _to) // find it
                 {
-                    List<MapGrid> path = new List<MapGrid>();
+                    List<MapCell> path = new List<MapCell>();
                     var node = child;
                     while (node != null)
                     {
-                        path.Add(node.Grid);
+                        path.Add(node.Cell);
                         node = node.Parent;
                     }
 
@@ -120,7 +120,7 @@ public class AStarPath
                 }
                 else
                 {
-                    var node = _list.Find(t => t.Grid == child.Grid);
+                    var node = _list.Find(t => t.Cell == child.Cell);
                     if (node == null)
                     {
                         _list.Add(child);
@@ -163,17 +163,17 @@ public class AStarPath
             {
                 if (r != 0 || c != 0)
                 {
-                    var row = node.Grid.Row + r;
-                    var column = node.Grid.Column + c;
-                    if (row >= 0 && row < _grids.Rows && column >= 0 && column < _grids.Columns)
+                    var row = node.Cell.Row + r;
+                    var column = node.Cell.Column + c;
+                    if (row >= 0 && row < _grid.Rows && column >= 0 && column < _grid.Columns)
                     {
-                        var nextGrid = _grids.Grids[row, column];
+                        var nextGrid = _grid.Cells[row, column];
                         if (nextGrid.IsWalkable())
                         {
                             if (Math.Abs(r) == 1 && Math.Abs(c) == 1)
                             {
-                                if (!_grids.Grids[row, node.Grid.Column].IsWalkable() ||
-                                    !_grids.Grids[node.Grid.Row, column].IsWalkable()) continue;
+                                if (!_grid.Cells[row, node.Cell.Column].IsWalkable() ||
+                                    !_grid.Cells[node.Cell.Row, column].IsWalkable()) continue;
                             }
 
                             var g = node.G + 10;
@@ -192,17 +192,17 @@ public class AStarPath
 
 public class Node
 {
-    public Node(Node parent, MapGrid grid, int g, int h)
+    public Node(Node parent, MapCell cell, int g, int h)
     {
         Parent = parent;
-        Grid = grid;
+        Cell = cell;
         H = h;
         G = g;
     }
 
     public Node Parent;
 
-    public readonly MapGrid Grid;
+    public readonly MapCell Cell;
 
     public int G; // 到原点的距离
 

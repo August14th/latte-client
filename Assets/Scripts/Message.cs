@@ -24,10 +24,12 @@ public class Message
     public byte[] Encode()
     {
         byte[] body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Body));
-        byte[] bytes = new byte[4 + 1 + 4 + body.Length];
+        byte[] bytes = new byte[4 + 4 + 1 + 4 + body.Length];
         BinaryWriter writer = new BinaryWriter(new MemoryStream(bytes));
         try
         {
+            // 消息序号
+            writer.Write(IPAddress.HostToNetworkOrder(0));
             // 协议号
             writer.Write(IPAddress.HostToNetworkOrder(Command));
             // 消息类型
@@ -50,11 +52,13 @@ public class Message
         BinaryReader reader = new BinaryReader(new MemoryStream(bytes));
         try
         {
+            // 消息序号
+            var id = IPAddress.NetworkToHostOrder(reader.ReadInt32());
             // 协议号
             var command = IPAddress.NetworkToHostOrder(reader.ReadInt32());
             // 消息类型
             var type = (MsgType) reader.ReadByte();
-            // 消息体长度
+            // 消息体长度p
             var length = IPAddress.NetworkToHostOrder(reader.ReadInt32());
             // 消息体
             var body = new MapBean(Encoding.UTF8.GetString(reader.ReadBytes(length)));

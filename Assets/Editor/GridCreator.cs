@@ -3,17 +3,17 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 
-public class GridsCreator : Editor
+public class GridCreator : Editor
 {
     [MenuItem("latte/生成地图网格信息")]
-    static void createGrids()
+    static void createGrid()
     {
         // 输出到文件
         var sceneName = Path.GetFileNameWithoutExtension(EditorApplication.currentScene);
-        createGrids("Assets/Resources/Grids/" + sceneName + ".bytes");
+        createGrid("Assets/Resources/Grids/" + sceneName + ".bytes");
     }
 
-    static void createGrids(string toFile)
+    static void createGrid(string toFile)
     {
         var colliders = FindObjectsOfType<Collider>();
         Collider walkable = null;
@@ -28,7 +28,7 @@ public class GridsCreator : Editor
 
         if (walkable != null)
         {
-            var grids = new MapGrids(walkable, safety, obstacle, 1f);
+            var grids = new MapGrid(walkable, safety, obstacle, 1f);
             var fileStream = new FileStream(toFile, FileMode.Create, FileAccess.Write);
             var writer = new BinaryWriter(fileStream);
             grids.WriteTo(writer);

@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Movement : MonoBehaviour
+public class Movement : Unit
 {
     private MoveState _state = new MoveState(0);
 
@@ -27,9 +27,9 @@ public class Movement : MonoBehaviour
     public void StopMoving()
     {
         _state = new MoveState(0);
-        G.Player.Play("atstand");
+        Outlook.Play("atstand");
 
-        StartCoroutine(Sync());
+        StartCoroutine(SyncMoving());
     }
 
     // 朝指定方向移动
@@ -37,8 +37,8 @@ public class Movement : MonoBehaviour
     {
         transform.forward = forward;
         _state = new MoveState(1);
-        G.Player.Play("run");
-        StartCoroutine(Sync());
+        Outlook.Play("run");
+        StartCoroutine(SyncMoving());
     }
 
     // 自动寻路到目标点
@@ -47,21 +47,22 @@ public class Movement : MonoBehaviour
         var path = G.Scene.FindPath(transform.position, target);
         if (path.Count != 0)
         {
+            G.Scene.DrawPath(path);
             path.RemoveAt(0);
-            transform.LookAt(path[0].Center());
-            G.SceneGrids.SetPath(path);
+            transform.LookAt(path[0]);
             _state = new MoveState(2, path);
-            G.Player.Play("run");
+            Outlook.Play("run");
 
-            StartCoroutine(Sync());
+            StartCoroutine(SyncMoving());
         }
     }
 
-    private IEnumerator Sync()
+    private IEnumerator SyncMoving()
     {
         // 同步位置
         var pos = transform.position;
-        var angle = Vector3.Angle(Vector3.forward, transform.forward);
+        var fwd = transform.forward;
+        var angle = Vector3.Angle(Vector3.forward, new Vector3(fwd.x, 0, fwd.z));
         if (transform.forward.x < 0) angle = -angle;
         var request = new Request(0x0202, new MapBean
         {
@@ -70,19 +71,14 @@ public class Movement : MonoBehaviour
             {"angle", (int) (angle * 100)},
             {"state", _state.State > 0 ? 1 : 0}
         });
-        yield return G.Client.Ask(request);
+        yield return G.Connection.Ask(request);
         request.GetResponse();
-    }
-
-    private void OnLevelWasLoaded(int level)
-    {
-        SetPosition(transform.position);
     }
 
     public void SetPosition(Vector3 newPos)
     {
         float y;
-        if (G.Scene.Grids.Sample(newPos.x, newPos.z, out y))
+        if (G.Scene.GetHeight(newPos.x, newPos.z, out y))
         {
             transform.position = new Vector3(newPos.x, y, newPos.z);
         }
@@ -95,29 +91,33 @@ public class Movement : MonoBehaviour
             case 0:
                 break;
             case 1:
-                var nextPos = transform.position + G.Player.Speed * Time.fixedDeltaTime * transform.forward;
+                var proceed = Attr.Speed * Time.fixedDeltaTime * transform.forward;
+                var nextPos = transform.position + proceed;
                 SetPosition(nextPos);
                 break;
             case 2:
                 // 自动寻路
-                nextPos = transform.position + G.Player.Speed * Time.fixedDeltaTime * transform.forward;
-                SetPosition(nextPos);
-                var path = (List<MapGrid>) _state.Param;
-                if (G.Scene.Grids.GetMapGrid(nextPos) == path[0])
+                proceed = Attr.Speed * Time.fixedDeltaTime * transform.forward;
+                var path = (List<Vector3>) _state.Param;
+                if ((path[0] - transform.position).sqrMagnitude < proceed.sqrMagnitude)
                 {
                     path.RemoveAt(0);
                     if (path.Count != 0)
                     {
-                        transform.LookAt(path[0].Center());
+                        transform.LookAt(path[0]);
                     }
                     else
                     {
                         _state = new MoveState(0);
-                        G.Player.Play("atstand");
+                        Outlook.Play("atstand");
                     }
 
                     // 每个节点都会同步
-                    StartCoroutine(Sync());
+                    StartCoroutine(SyncMoving());
+                }
+                else
+                {
+                    SetPosition(transform.position + proceed);
                 }
 
                 break;

@@ -7,11 +7,11 @@ using System.Net.Sockets;
 using System.Resources;
 using UnityEngine;
 
-public class GameClient : MonoBehaviour
+public class Connection : MonoBehaviour
 {
-    private const int HeadSize = 9; // 协议号4+消息类型1+消息体长度4
+    private const int HeadSize = 13; // 消息序号4+协议号4+消息类型1+消息体长度4
 
-    private const int BodySizeOffset = 5; // 消息体长度字段在头部的偏移
+    private const int BodySizeOffset = 4 + 4 + 1; // 消息体长度字段在头部的偏移
 
     private TcpClient _client;
 
@@ -19,17 +19,14 @@ public class GameClient : MonoBehaviour
 
     public string Host = "localhost";
 
-    public int Port = 2018;
-
-    public Boolean IsConnected;
+    public int Port = 2019;
 
     private void Start()
     {
         _client = new TcpClient(Host, Port);
         // 启动读循环
         StartCoroutine(Loop());
-        IsConnected = true;
-        print("Connected to Server at:" + Host + ":" + Port);
+        Debug.Log("Connected to Server at:" + Host + ":" + Port);
     }
 
     public Coroutine Ask(Request request)
@@ -73,7 +70,7 @@ public class GameClient : MonoBehaviour
     {
         BinaryWriter writer = new BinaryWriter(_client.GetStream());
         writer.Write(message.Encode());
-        print(DateTime.Now.ToString("HH:mm:ss:fff") + "C -> 0x" + string.Format("{0:x}", message.Command) +
+        Debug.Log(DateTime.Now.ToString("HH:mm:ss:fff") + "C -> 0x" + string.Format("{0:x}", message.Command) +
               ":" + message.Body);
     }
 
@@ -119,7 +116,7 @@ public class GameClient : MonoBehaviour
                 reader.ReadBytes(bodySize).CopyTo(bytes, HeadSize);
                 // 解码
                 var message = Message.Decode(bytes);
-                print(DateTime.Now.ToString("HH:mm:ss:fff") + "S <- 0x" + string.Format("{0:x}", message.Command) +
+                Debug.Log(DateTime.Now.ToString("HH:mm:ss:fff") + "S <- 0x" + string.Format("{0:x}", message.Command) +
                       ":" + message.Body);
 
                 switch (message.Type)
